@@ -1,0 +1,25 @@
+import { NextResponse } from "next/server";
+import { prisma } from "@/lib/prisma";
+import { getOrCreateDemoUser } from "@/lib/user";
+import { computeResurfacingWindow } from "@/lib/resurfacing";
+
+export async function GET() {
+  const user = await getOrCreateDemoUser();
+  const { end, staleBefore } = computeResurfacingWindow();
+
+  const dueCount = await prisma.note.count({
+    where: {
+      userId: user.id,
+      isArchived: false,
+      OR: [
+        { nextReviewAt: { lte: end } },
+        {
+          AND: [{ nextReviewAt: null }, { createdAt: { lte: staleBefore } }],
+        },
+      ],
+    },
+  });
+
+  return NextResponse.json({ dueCount });
+}
+
