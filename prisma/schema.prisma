@@ -11,11 +11,13 @@ model User {
   id        String   @id @default(cuid())
   email     String   @unique
   name      String?
+  passwordHash String?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   notes Note[]
   tags  Tag[]
+  sessions Session[]
 }
 
 model Note {
@@ -56,3 +58,13 @@ model NoteTag {
 
   @@id([noteId, tagId])
 }
+
+model Session {
+  id           String   @id @default(cuid())
+  userId       String
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  sessionToken String   @unique
+  createdAt    DateTime @default(now())
+  expiresAt    DateTime
+}
+

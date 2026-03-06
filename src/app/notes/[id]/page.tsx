@@ -1,7 +1,10 @@
 import { notFound, redirect } from "next/navigation";
 import Link from "next/link";
+import ReactMarkdown from "react-markdown";
 import { prisma } from "@/lib/prisma";
 import { getOrCreateDemoUser } from "@/lib/user";
+import { getCurrentLanguage } from "@/lib/i18n";
+import { FormHotkeys } from "@/app/_components/FormHotkeys";
 
 async function updateNote(formData: FormData) {
   "use server";
@@ -107,17 +110,59 @@ interface NotePageProps {
 export default async function NotePage(props: NotePageProps) {
   const params = await props.params;
   const user = await getOrCreateDemoUser();
+  const lang = await getCurrentLanguage();
 
-  const note = await prisma.note.findFirst({
-    where: { id: params.id, userId: user.id },
-    include: {
-      tags: {
-        include: {
-          tag: true,
+  const t =
+    lang === "pt"
+      ? {
+          breadcrumb: "Nota",
+          archived: "Arquivada",
+          back: "Voltar para notas",
+          archive: "Arquivar",
+          unarchive: "Desarquivar",
+          fieldTitle: "Título",
+          fieldContent: "Conteúdo",
+          fieldTags: "Tags",
+          tagsPlaceholder: "pesquisa, programação, livros",
+          tagsHelp:
+            "Separadas por vírgula. Tags ajudam a agrupar ideias e a ressurgir depois.",
+          lastTouchedPrefix: "Última edição",
+          save: "Salvar alterações",
+          untitled: "Nota sem título",
+        }
+      : {
+          breadcrumb: "Note",
+          archived: "Archived",
+          back: "Back to notes",
+          archive: "Archive",
+          unarchive: "Unarchive",
+          fieldTitle: "Title",
+          fieldContent: "Content",
+          fieldTags: "Tags",
+          tagsPlaceholder: "research, programming, books",
+          tagsHelp:
+            "Comma-separated. Tags help cluster related ideas and resurfacing later.",
+          lastTouchedPrefix: "Last touched",
+          save: "Save changes",
+          untitled: "Untitled note",
+        };
+
+  const [note, availableTags] = await Promise.all([
+    prisma.note.findFirst({
+      where: { id: params.id, userId: user.id },
+      include: {
+        tags: {
+          include: {
+            tag: true,
+          },
         },
       },
-    },
-  });
+    }),
+    prisma.tag.findMany({
+      where: { userId: user.id },
+      orderBy: { name: "asc" },
+    }),
+  ]);
 
   if (!note) {
     notFound();
@@ -133,15 +178,15 @@ export default async function NotePage(props: NotePageProps) {
       <div className="flex items-center justify-between gap-3">
         <div>
           <p className="text-[11px] font-medium uppercase tracking-wide text-zinc-500">
-            Note
+            {t.breadcrumb}
           </p>
           <div className="mt-1 flex items-center gap-2">
             <h1 className="text-xl font-semibold tracking-tight text-zinc-50">
-              {note.title || "Untitled note"}
+              {note.title || t.untitled}
             </h1>
             {note.isArchived && (
               <span className="inline-flex items-center rounded-full bg-zinc-900 px-2 py-0.5 text-[10px] font-medium text-zinc-400">
-                Archived
+                {t.archived}
               </span>
             )}
           </div>
@@ -151,7 +196,7 @@ export default async function NotePage(props: NotePageProps) {
             href="/notes"
             className="text-xs font-medium text-zinc-400 hover:text-zinc-100"
           >
-            Back to notes
+            {t.back}
           </Link>
           <form action={toggleArchive}>
             <input type="hidden" name="id" value={note.id} />
@@ -164,13 +209,14 @@ export default async function NotePage(props: NotePageProps) {
               type="submit"
               className="text-xs font-medium text-zinc-400 hover:text-zinc-100"
             >
-              {note.isArchived ? "Unarchive" : "Archive"}
+              {note.isArchived ? t.unarchive : t.archive}
             </button>
           </form>
         </div>
       </div>
 
       <form
+        id="edit-note-form"
         action={updateNote}
         className="space-y-4 rounded-2xl border border-zinc-900 bg-zinc-950/60 p-4"
       >
@@ -178,7 +224,7 @@ export default async function NotePage(props: NotePageProps) {
 
         <div className="space-y-2">
           <label className="block text-xs font-medium text-zinc-300">
-            Title
+            {t.fieldTitle}
           </label>
           <input
             name="title"
@@ -189,7 +235,7 @@ export default async function NotePage(props: NotePageProps) {
 
         <div className="space-y-2">
           <label className="block text-xs font-medium text-zinc-300">
-            Content
+            {t.fieldContent}
           </label>
           <textarea
             name="content"
@@ -197,27 +243,44 @@ export default async function NotePage(props: NotePageProps) {
             defaultValue={note.content ?? ""}
             className="w-full resize-y rounded-lg border border-zinc-800 bg-zinc-950 px-3 py-2 text-sm text-zinc-50 placeholder:text-zinc-600 focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
           />
+          {note.content && (
+            <div className="mt-2 rounded-lg border border-zinc-800 bg-zinc-950/60 p-3">
+              <p className="mb-1 text-[11px] font-medium text-zinc-400">
+                {lang === "pt" ? "Pré-visualização" : "Preview"}
+              </p>
+              <div className="text-sm text-zinc-200">
+                <ReactMarkdown>{note.content}</ReactMarkdown>
+              </div>
+            </div>
+          )}
         </div>
 
         <div className="space-y-2">
           <label className="block text-xs font-medium text-zinc-300">
-            Tags
+            {t.fieldTags}
           </label>
           <input
             name="tags"
+            list="tags-list"
             defaultValue={tagValue}
             className="w-full rounded-lg border border-zinc-800 bg-zinc-950 px-3 py-2 text-sm text-zinc-50 placeholder:text-zinc-600 focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
-            placeholder="research, programming, books"
+            placeholder={t.tagsPlaceholder}
           />
+          {availableTags.length > 0 && (
+            <datalist id="tags-list">
+              {availableTags.map((tag) => (
+                <option key={tag.id} value={tag.name} />
+              ))}
+            </datalist>
+          )}
           <p className="text-[11px] text-zinc-500">
-            Comma-separated. Tags help cluster related ideas and resurfacing
-            later.
+            {t.tagsHelp}
           </p>
         </div>
 
         <div className="flex items-center justify-between gap-3 pt-2">
           <p className="text-[11px] text-zinc-500">
-            Last touched{" "}
+            {t.lastTouchedPrefix}{" "}
             {note.updatedAt.toLocaleDateString(undefined, {
               year: "numeric",
               month: "short",
@@ -228,10 +291,11 @@ export default async function NotePage(props: NotePageProps) {
             type="submit"
             className="inline-flex items-center justify-center rounded-full bg-zinc-50 px-4 py-2 text-xs font-medium text-zinc-950 hover:bg-zinc-200"
           >
-            Save changes
+            {t.save}
           </button>
         </div>
       </form>
+      <FormHotkeys formId="edit-note-form" />
     </div>
   );
 }

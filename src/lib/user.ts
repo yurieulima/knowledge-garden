@@ -1,16 +1,10 @@
-import { prisma } from "./prisma";
+import { requireUser } from "./auth";
 
-const DEMO_USER_EMAIL = "demo@knowledge-garden.local";
-
+// Kept for backwards-compat with existing imports.
+// Now it simply enforces that a real authenticated user exists.
 export async function getOrCreateDemoUser() {
-  return prisma.user.upsert({
-    where: { email: DEMO_USER_EMAIL },
-    update: {},
-    create: {
-      email: DEMO_USER_EMAIL,
-      name: "Demo User",
-    },
-  });
+  return requireUser();
 }
+
 
 

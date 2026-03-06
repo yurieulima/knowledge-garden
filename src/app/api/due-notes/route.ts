@@ -1,10 +1,14 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { getOrCreateDemoUser } from "@/lib/user";
+import { getCurrentUser } from "@/lib/auth";
 import { computeResurfacingWindow } from "@/lib/resurfacing";
 
 export async function GET() {
-  const user = await getOrCreateDemoUser();
+  const user = await getCurrentUser();
+  if (!user) {
+    return NextResponse.json({ dueCount: 0 });
+  }
+
   const { end, staleBefore } = computeResurfacingWindow();
 
   const dueCount = await prisma.note.count({
@@ -22,4 +26,5 @@ export async function GET() {
 
   return NextResponse.json({ dueCount });
 }
+
 
