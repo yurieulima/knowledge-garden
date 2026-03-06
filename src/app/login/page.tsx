@@ -8,6 +8,15 @@ import {
 } from "@/lib/auth";
 import { getCurrentLanguage } from "@/lib/i18n";
 
+type UserWithPassword = {
+  id: string;
+  email: string;
+  name: string | null;
+  createdAt: Date;
+  updatedAt: Date;
+  passwordHash: string | null;
+};
+
 async function login(formData: FormData) {
   "use server";
 
@@ -34,9 +43,10 @@ async function login(formData: FormData) {
     redirect("/login?error=missing");
   }
 
-  const user = await prisma.user.findUnique({
+  const rawUser = await prisma.user.findUnique({
     where: { email },
   });
+  const user = rawUser as UserWithPassword | null;
 
   if (!user || !user.passwordHash) {
     redirect("/login?error=invalid");
@@ -70,9 +80,10 @@ async function signup(formData: FormData) {
     redirect("/login?error=weak");
   }
 
-  const existing = await prisma.user.findUnique({
+  const rawExisting = await prisma.user.findUnique({
     where: { email },
   });
+  const existing = rawExisting as UserWithPassword | null;
 
   if (existing && existing.passwordHash) {
     redirect("/login?error=exists");
